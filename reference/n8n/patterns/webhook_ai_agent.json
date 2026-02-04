@@ -1,0 +1,76 @@
+{
+    "name": "Pattern: Webhook to AI Agent",
+    "nodes": [
+        {
+            "parameters": {
+                "path": "webhook",
+                "options": {}
+            },
+            "id": "webhook-node-id",
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                0,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "options": {}
+            },
+            "id": "model-node-id",
+            "name": "Chat Model",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+            "typeVersion": 1,
+            "position": [
+                180,
+                150
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "OPENAI_API_REF",
+                    "name": "OpenAI account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "content": "Analyze the input: {{ $json.body }}",
+                "options": {}
+            },
+            "id": "agent-node-id",
+            "name": "AI Agent",
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 1,
+            "position": [
+                220,
+                0
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Chat Model": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

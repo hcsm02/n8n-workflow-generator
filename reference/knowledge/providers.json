@@ -1,0 +1,70 @@
+{
+    "providers": {
+        "gmail": {
+            "name": "Gmail",
+            "preferred_node": "n8n-nodes-base.gmail",
+            "auth_type": "OAuth2",
+            "requirements": [
+                "https_domain",
+                "configurable_webhook_url"
+            ],
+            "fallback": {
+                "node": "n8n-nodes-base.emailReadImap",
+                "auth_type": "imap_password",
+                "notes": "Gmail IMAP requires App Password. OAuth is strictly preferred."
+            }
+        },
+        "outlook": {
+            "name": "Microsoft 365 / Outlook",
+            "preferred_node": "n8n-nodes-base.microsoftOutlook",
+            "auth_type": "OAuth2",
+            "requirements": [
+                "https_domain"
+            ],
+            "fallback": {
+                "node": "n8n-nodes-base.emailReadImap",
+                "auth_type": "imap_password",
+                "notes": "IMAP might be disabled by organization policy."
+            }
+        },
+        "qq": {
+            "name": "QQ Mail",
+            "preferred_node": "n8n-nodes-base.emailReadImap",
+            "auth_type": "imap_password",
+            "host": "imap.qq.com",
+            "port": 993,
+            "secure": true,
+            "requirements": [
+                "auth_code"
+            ]
+        },
+        "163": {
+            "name": "163 Mail",
+            "preferred_node": "n8n-nodes-base.emailReadImap",
+            "auth_type": "imap_password",
+            "host": "imap.163.com",
+            "port": 993,
+            "secure": true
+        },
+        "generic": {
+            "name": "Generic IMAP",
+            "preferred_node": "n8n-nodes-base.emailReadImap",
+            "auth_type": "imap_password"
+        }
+    },
+    "decision_tree": {
+        "gmail_oauth": {
+            "condition": "provider == 'gmail' AND has_https AND can_config_webhook",
+            "result": "n8n-nodes-base.gmail"
+        },
+        "gmail_fallback": {
+            "condition": "provider == 'gmail' AND (NOT has_https OR NOT can_config_webhook)",
+            "result": "n8n-nodes-base.emailReadImap",
+            "warning": "Gmail OAuth requires HTTPS and configured Webhook URL. Falling back to IMAP (App Password required)."
+        },
+        "default_imap": {
+            "condition": "provider in ['qq', '163', 'generic']",
+            "result": "n8n-nodes-base.emailReadImap"
+        }
+    }
+}

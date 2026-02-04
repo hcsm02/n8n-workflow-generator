@@ -25,6 +25,24 @@ export const PlanReview: React.FC<PlanReviewProps> = ({ plan, onConfirm, isConfi
                     </p>
                 </div>
 
+                {/* Pre-flight Checks / Questions */}
+                {plan.questions_to_user && plan.questions_to_user.length > 0 && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <h4 className="text-sm font-bold text-amber-800 uppercase tracking-wider mb-2 flex items-center gap-2">
+                            <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+                            Pre-flight Checks
+                        </h4>
+                        <ul className="list-disc list-inside text-sm text-amber-800 space-y-1">
+                            {plan.questions_to_user.map((q, i) => (
+                                <li key={i}>{q}</li>
+                            ))}
+                        </ul>
+                        <p className="text-xs text-amber-600 mt-2 italic">
+                            * Please ensure these conditions are met, otherwise the workflow might fail.
+                        </p>
+                    </div>
+                )}
+
                 {/* Node Flow Visualization (List) */}
                 <div>
                     <h4 className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-3">Execution Flow</h4>
