@@ -4,6 +4,7 @@
 
 ## 1. 核心设计理念 (Core Philosophy)
 代码生成的上限取决于其背后的领域知识。为了实现生产级可用性，我们必须构建一个覆盖**服务能力**、**架构范式**和**运行环境**的结构化知识库，并优先采用经验证的模板。
+**【核心基建升级】**：全面拥抱 [n8n-mcp](https://github.com/czlonkowski/n8n-mcp) 生态。不再手工维护脆弱的节点 JSON 配置字典，而是将 n8n-mcp（其内置了由 n8n 源码解析而来的高优离线 SQLite 知识库引擎）深度挂载为底层 Tool，实现**零幻觉节点认知**、**内置 2500+ 模板秒级检索**以及**原生级工作流校验闭环**。
 
 ## 2. 知识体系架构 (Knowledge Architecture)
 
@@ -12,12 +13,10 @@
 ### 第一层：服务能力 (Service Capabilities)
 *定义：关于外部服务的静态知识（认证方式、API限制、最佳实践）。*
 
-| 领域 | 文件位置 | 内容示例 | 状态 |
-| :--- | :--- | :--- | :--- |
-| **邮件** | `knowledge/providers.json` | Gmail OAuth 对比 IMAP 配置，SSL 端口要求。 | ✅ 已完成 |
-| **大模型** | `knowledge/models.json` | OpenAI/Anthropic/DeepSeek 参数差异，Function Calling 支持情况。 | 待办 |
-| **数据库** | `knowledge/databases.json` | Postgres vs MySQL 连接串格式，SSL 要求，Upsert 逻辑差异。 | 待办 |
-| **消息** | `knowledge/messaging.json` | Slack (Token vs Webhook), Discord (Intents), Teams 限制。 | 待办 |
+| 领域 | 获取方式 & 内容示例 | 状态 |
+| :--- | :--- | :--- |
+| **All Nodes** | **[核心] 直接调用 n8n-mcp 的 `get_node` 工具**。<br>包含全量 1000+ 节点（官方+验证社区）的参数、Type、默认值。彻底消灭“虚构参数”幻觉。 | 待集成 |
+| **应用限制** | 基于 n8n-mcp 返回的关键属性（仅 10-20 个核心参数），指导 AI 准确配置 OAuth、API Key 等鉴权字典。 | 待集成 |
 
 ### 第二层：架构范式 (Architectural Patterns)
 *定义：解决特定问题的标准拓扑结构，防止 AI "臆测"错误的连线。*
@@ -41,16 +40,14 @@
 
 ## 3. 实施路线图 (Implementation Roadmap)
 
-### 第一阶段：基础设施 (已完成)
-- [x] 建立知识库目录结构。
-- [x] 注入邮件服务商知识 (`providers.json`)。
-- [x] 注入基础 AI 范式 (`webhook_ai_agent.json`)。
-- [x] 更新 Architect Agent 以支持查阅知识库。
-- [x] 更新 Coder Agent 以支持参考范式代码。
+### 第一阶段：基础设施 (阶段演进)
+- [x] 建立知识库目录结构与双 Agent (Architect & Coder) 协同原型。
+- [x] 注入基础 AI 范式 (`webhook_ai_agent.json`) 和手工测试知识。
+- [ ] **【重点转向】集成 n8n-mcp**: 将 n8n-mcp 作为底层工具服务运行，为 LangChain Agent 提供 `get_node`, `search_nodes` 接口。替代原有的 `providers.json`。
 
-### 第二阶段：高频场景攻坚 (优先级：高)
-- [ ] **LLM 模型知识**: 创建 `knowledge/models.json`，让 Architect 能根据任务复杂度选择模型（如：简单总结用 mini，复杂逻辑用 sonnet）。
-- [ ] **数据流处理**: 创建 `patterns/loop_pagination.json`，解决 50% 以上工作流都会遇到的列表处理和分页问题。
+### 第二阶段：精准构型与测试闭环 (优先级：高)
+- [ ] **Validator 审查者引入**: 在 Agent 链路中引入 `validate_workflow` 调用。生成的工作流必须通过 MCP 内置验证器的约束校验（如缺必填项、连线类型不匹配）才能交付。
+- [ ] **直连 N8N 调试**: 支持用户输入自己的 `N8N_API_URL` 和 `N8N_API_KEY`，实现 AI 生成 -> API 直推 n8n 草稿箱 -> 执行测试获取 Log -> 动态微调的完整迭代（完成最后 25% 的调教）。
 
 ### 第三阶段：环境感知 (优先级：中)
 - [ ] **上下文注入**: 更新 Architect Prompt 读取 `user_profile.json`。
@@ -59,31 +56,31 @@
 ### 第四阶段：模板优先策略 (Template-First Strategy)
 *核心逻辑：与其从零生成，不如基于成熟方案修改。*
 
-**1. 模板库建设 (`reference/templates/`)**
-按业务场景通过文件夹组织模板：
-- `productivity/` (日报, 会议纪要)
-- `marketing/` (线索评分, 社交媒体发布)
-- `devops/` (故障报警, 数据库备份)
+### 第四阶段：模板优先策略 (Template-First Strategy)
+*核心逻辑：与其从零生成，不如基于成熟方案修改。复杂流程 75% 靠模板，25% 靠微调。*
 
-**2. 检索逻辑升级**
-Architect Agent 的第一步动作改为 **"相似度检索"**：
-1.  **用户请求**: "帮我做一个每天发天气预报邮件的工作流"。
-2.  **检索**: 在 `reference/templates/**` 中向量搜索。
-3.  **结果**: 找到 `daily_email_digest.json` (相似度 0.85)。
-4.  **决策**: 指挥 Coder *"加载 'daily_email_digest.json' 模板，将其中的 'Gmail' 节点替换为 'Weather API' 节点"*。
+**检索逻辑升级 (Powered by n8n-mcp)**
+Architect Agent 的第一步动作强制改为 **调用 n8n-mcp 检索模板**：
+1.  **用户请求**: "帮我做一个每天定时爬取 HackerNews 并发到企业微信的流程。"
+2.  **检索 (MCP)**: 调用 `search_templates({ searchMode: 'by_task', task: 'HackerNews' })` 从 MCP 内置的 2500+ 真人验证模板库检索。
+3.  **提取**: 找到相关骨架模板，调用 `get_template` 获取。
+4.  **决策组装**: 指挥 Coder *"保留抓取逻辑，把输出端节点用 `get_node` 查询企业微信并替换进去"*。
 
-**收益**: 从根本上保证了工作流骨架的正确性。
+**收益**: 站在官方模板库的肩膀上，从根本上保证了宏观骨架的一发入魂。
 
 ---
 
 ## 4. 集成与交互策略
 
 - **Architect (架构师)**:
-    1.  优先执行 **模板检索 (Phase 4)**。
-    2.  若命中模板 -> 执行 **"修改/适配策略"**。
-    3.  若未命中 -> 执行 **"组合生成策略"** (查询 Layer 1 & 2)。
-    4.  始终查询 **Layer 3 (环境)** 进行可行性预检。
+    1.  优先调用 MCP 执行 **模板检索 (Template Discovery)**。
+    2.  若命中模板 -> 提取结构，规划 **"节点替换微调策略"**。
+    3.  若未命中 -> 调用 MCP 查阅组合节点，规划 **"组合生成策略"**。
+    4.  感知 Layer 3 (环境) 进行初步架构评估。
 - **Coder (工程师)**:
-    - 负责细节参数填充，并在需要时查询 **Layer 2 (范式)** 补充代码片段。
+    - 根据 Architect 给出的蓝图，调用 MCP 的 `get_node_schema` 准确填充参数，组装完整 JSON 流程图。
+- **Critic / Validator (审查测试官)** 【新引入层】:
+    - 调用 MCP 的 `validate_workflow` 筛查语法与强约束错误。
+    - （进阶）推送到用户 n8n 集群运行，分析 Return Server Logs 进行错误回退自修正。
 
-这种分离确保了架构师专注于"做正确的决定"，而工程师专注于"把代码写对"。
+这种分离不仅各司其职，更是完成了 **“生成 -> 校验 -> 反馈优化”** 的高阶智能体闭环。

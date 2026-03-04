@@ -18,6 +18,7 @@ app.add_middleware(
 
 class PlanRequest(BaseModel):
     prompt: str
+    n8n_version: str = "1.76.1"  # 用户的 n8n 版本，默认为最新稳定版
     thread_id: Optional[str] = None
 
 class ConfirmRequest(BaseModel):
@@ -29,26 +30,26 @@ def health_check():
     return {"status": "ok", "service": "n8n-workflow-generator"}
 
 @app.post("/plan")
-def create_plan(request: PlanRequest):
+async def create_plan(request: PlanRequest):
     """
     Step 1: Architect analyzes request and creates a plan.
     Returns: The plan for user review.
     """
+    print(f"DEBUG: Received plan request for prompt: {request.prompt}")
     thread_id = request.thread_id or str(uuid.uuid4())
     config = {"configurable": {"thread_id": thread_id}}
     
     try:
         # Start the graph. It will stop BEFORE 'coder' node due to interrupt.
-        inputs = {"user_request": request.prompt, "messages": []}
+        inputs = {"user_request": request.prompt, "n8n_version": request.n8n_version, "messages": []}
         
-        # We use stream or invoke. Invoke will run until interrupt.
-        # for event in graph.stream(inputs, config=config): pass 
-        # But invoke is simpler if we trust it halts.
+        print(f"DEBUG: Invoking graph.ainvoke...")
+        result = await graph.ainvoke(inputs, config=config)
+        print(f"DEBUG: graph.ainvoke completed.")
         
-        # We need to run it. 
-        # Note: 'invoke' returns the FINAL state. But since it interrupts, it returns state at interrupt.
-        result = graph.invoke(inputs, config=config)
-        
+        if result.get("error"):
+            raise HTTPException(status_code=500, detail=result["error"])
+            
         return {
             "status": "plan_ready",
             "thread_id": thread_id,
@@ -58,7 +59,7 @@ def create_plan(request: PlanRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/confirm")
-def confirm_and_generate(request: ConfirmRequest):
+async def confirm_and_generate(request: ConfirmRequest):
     """
     Step 2: User confirms the plan. Coder generates the code.
     Returns: The final n8n JSON.
@@ -67,12 +68,26 @@ def confirm_and_generate(request: ConfirmRequest):
     
     try:
         # Resume the graph. sending None proceeds from interrupt.
-        result = graph.invoke(None, config=config)
+        print(f"DEBUG: Confirming plan for thread_id: {request.thread_id}")
+        result = await graph.ainvoke(None, config=config)
+        print(f"DEBUG: Confirm result keys: {list(result.keys()) if result else 'None'}")
+        print(f"DEBUG: json_result is {'set' if result.get('json_result') else 'None/empty'}")
+        print(f"DEBUG: error is: {result.get('error', 'no error')}")
         
         if result.get("error"):
             raise HTTPException(status_code=500, detail=result["error"])
-            
-        return result.get("json_result")
+        
+        json_result = result.get("json_result")
+        
+        # Fallback: if json_result is None but we have a valid plan with nodes/connections,
+        # use the plan itself as the workflow JSON (since Architect already produced it)
+        if not json_result and result.get("plan"):
+            plan = result["plan"]
+            if isinstance(plan, dict) and "nodes" in plan and "connections" in plan:
+                print("DEBUG: Using plan as fallback json_result (Architect already produced workflow-like JSON)")
+                json_result = plan
+        
+        return json_result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
