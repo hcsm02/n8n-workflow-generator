@@ -8,3 +8,5 @@ pydantic
 python-dotenv
 mcp
 langchain-mcp-adapters
+langgraph-checkpoint-sqlite
+aiosqlite

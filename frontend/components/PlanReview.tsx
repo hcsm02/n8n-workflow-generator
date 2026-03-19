@@ -1,5 +1,5 @@
-import React from 'react';
-import { Network, ArrowRight, CheckCircle2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Network, ArrowRight, CheckCircle2, Lightbulb, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 import { WorkflowPlan } from '@/lib/api';
 
 interface PlanReviewProps {
@@ -9,14 +9,45 @@ interface PlanReviewProps {
 }
 
 export const PlanReview: React.FC<PlanReviewProps> = ({ plan, onConfirm, isConfirming }) => {
+    const [showThinking, setShowThinking] = useState(true);
+
     return (
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-            <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center gap-2">
-                <Network className="w-5 h-5 text-blue-600" />
-                <h3 className="font-semibold text-slate-800">Workflow Blueprint</h3>
+            <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                    <Network className="w-5 h-5 text-blue-600" />
+                    <h3 className="font-semibold text-slate-800">Workflow Blueprint</h3>
+                </div>
+                {plan.referenced_templates && plan.referenced_templates.length > 0 && (
+                    <div className="flex items-center gap-2 text-xs text-slate-500 bg-white px-3 py-1 rounded-full border border-slate-200">
+                        <BookOpen className="w-3 h-3" />
+                        <span>Referenced: {plan.referenced_templates.join(', ')}</span>
+                    </div>
+                )}
             </div>
 
             <div className="p-6 space-y-6">
+                {/* Thinking Process Section */}
+                {plan.thinking_process && (
+                    <div className="bg-amber-50/30 border border-amber-100 rounded-lg overflow-hidden">
+                        <button 
+                            onClick={() => setShowThinking(!showThinking)}
+                            className="w-full px-4 py-3 flex items-center justify-between text-amber-900 bg-amber-50/50 hover:bg-amber-50 transition-colors"
+                        >
+                            <div className="flex items-center gap-2 font-medium text-sm">
+                                <Lightbulb className="w-4 h-4 text-amber-500" />
+                                <span>AI Thinking Process</span>
+                            </div>
+                            {showThinking ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </button>
+                        {showThinking && (
+                            <div className="p-4 text-sm text-slate-600 leading-relaxed border-t border-amber-100 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <p className="whitespace-pre-wrap">{plan.thinking_process}</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Summary Section */}
                 <div>
                     <h4 className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-2">Summary</h4>
@@ -33,7 +64,7 @@ export const PlanReview: React.FC<PlanReviewProps> = ({ plan, onConfirm, isConfi
                             Pre-flight Checks
                         </h4>
                         <ul className="list-disc list-inside text-sm text-amber-800 space-y-1">
-                            {plan.questions_to_user.map((q, i) => (
+                            {plan.questions_to_user.map((q: string, i: number) => (
                                 <li key={i}>{q}</li>
                             ))}
                         </ul>
